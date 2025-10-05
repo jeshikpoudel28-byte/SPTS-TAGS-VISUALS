@@ -1,3 +1,396 @@
+-- SPTS Tags Visuals (Responsive, Mobile & Desktop Friendly)
+-- LocalScript: run locally (drop into StarterPlayerScripts or execute client-side)
+-- NO remotes, NO external webhooks. Aesthetic UI with corners, shadows, smooth scrolling, responsive sizing.
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Prevent duplicates
+if playerGui:FindFirstChild("SPTSTagsVisuals") then
+    playerGui:FindFirstChild("SPTSTagsVisuals"):Destroy()
+end
+
+-- Helper - create UI objects quickly
+local function new(class, props)
+    local obj = Instance.new(class)
+    if props then
+        for k, v in pairs(props) do
+            obj[k] = v
+        end
+    end
+    return obj
+end
+
+-- Create ScreenGui
+local screenGui = new("ScreenGui", {Name = "SPTSTagsVisuals", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling})
+screenGui.Parent = playerGui
+
+-- Responsive sizing function
+local function getMainSize(viewportSize)
+    -- viewportSize is Vector2
+    local width = viewportSize.X
+    local height = viewportSize.Y
+
+    -- Desktop: medium window, Mobile: wider percentage
+    local wScale = (width < 700) and 0.94 or (width < 1200 and 0.6 or 0.4)
+    local hScale = (height < 600) and 0.8 or 0.7
+
+    -- Convert to UDim2
+    return UDim2.new(wScale, 0, hScale, 0)
+end
+
+-- Container (for shadow effect)
+local container = new("Frame", {
+    Size = UDim2.new(0.4, 0, 0.7, 0),
+    Position = UDim2.new(0.3, 0, 0.15, 0),
+    BackgroundTransparency = 1,
+    Parent = screenGui
+})
+
+-- Shadow
+local shadow = new("ImageLabel", {
+    Size = UDim2.new(1, 16, 1, 16),
+    Position = UDim2.new(0, -8, 0, -8),
+    BackgroundTransparency = 1,
+    Image = "rbxassetid://244221613", -- subtle shadow texture (built-in style)
+    ScaleType = Enum.ScaleType.Slice,
+    SliceCenter = Rect.new(20, 20, 200, 200),
+    ZIndex = 1,
+    Parent = container
+})
+shadow.ImageTransparency = 0.65
+
+-- Main Frame
+local mainFrame = new("Frame", {
+    Size = container.Size,
+    Position = UDim2.new(0, 8, 0, 8),
+    BackgroundColor3 = Color3.fromRGB(24, 26, 30),
+    BorderSizePixel = 0,
+    ZIndex = 2,
+    Parent = container
+})
+
+-- UICorner
+local mainCorner = new("UICorner", {CornerRadius = UDim.new(0, 14), Parent = mainFrame})
+
+-- Top bar
+local titleBar = new("Frame", {
+    Size = UDim2.new(1, 0, 0, 44),
+    BackgroundColor3 = Color3.fromRGB(30, 33, 38),
+    BorderSizePixel = 0,
+    Parent = mainFrame
+})
+new("UICorner", {CornerRadius = UDim.new(0, 12), Parent = titleBar})
+
+local titleLabel = new("TextLabel", {
+    Size = UDim2.new(1, -120, 1, 0),
+    Position = UDim2.new(0, 16, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "SPTS Tags Visuals",
+    Font = Enum.Font.GothamBold,
+    TextSize = 18,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextColor3 = Color3.fromRGB(240,240,240),
+    Parent = titleBar
+})
+
+-- Title flair (small gradient strip)
+local flair = new("Frame", {Size = UDim2.new(0, 6, 1, 0), Position = UDim2.new(0, 8, 0, 0), BackgroundColor3 = Color3.fromRGB(138, 43, 226), Parent = titleBar})
+new("UICorner", {CornerRadius = UDim.new(0, 6), Parent = flair})
+
+-- Buttons: minimize and close (styled)
+local btnContainer = new("Frame", {Size = UDim2.new(0, 120, 1, 0), Position = UDim2.new(1, -120, 0, 0), BackgroundTransparency = 1, Parent = titleBar})
+
+local function makeTitleButton(text, color)
+    local b = new("TextButton", {
+        Size = UDim2.new(0, 44, 0, 30),
+        BackgroundColor3 = color,
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Font = Enum.Font.GothamBold,
+        Text = text,
+        TextSize = 18,
+        TextColor3 = Color3.fromRGB(244,244,244),
+        Parent = btnContainer
+    })
+    new("UICorner", {CornerRadius = UDim.new(0, 8), Parent = b})
+    return b
+end
+
+local minimizeBtn = makeTitleButton("—", Color3.fromRGB(70, 70, 75))
+minimizeBtn.Position = UDim2.new(1, -94, 0.5, -15)
+
+local closeBtn = makeTitleButton("✕", Color3.fromRGB(200, 60, 60))
+closeBtn.Position = UDim2.new(1, -44, 0.5, -15)
+
+-- Main content area (scrolling)
+local content = new("ScrollingFrame", {
+    Size = UDim2.new(1, -24, 1, -64),
+    Position = UDim2.new(0, 12, 0, 52),
+    CanvasSize = UDim2.new(0, 0, 0, 0),
+    ScrollBarThickness = 8,
+    BackgroundTransparency = 1,
+    Parent = mainFrame
+})
+local contentList = new("UIListLayout", {Parent = content, Padding = UDim.new(0, 10)})
+contentList.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Smooth scrolling for touch (improved feel)
+content.ScrollingDirection = Enum.ScrollingDirection.Y
+
+contentList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    content.CanvasSize = UDim2.new(0, 0, 0, contentList.AbsoluteContentSize.Y + 20)
+end)
+
+-- Small helper to create section labels
+local function sectionLabel(text)
+    local lbl = new("TextLabel", {
+        Size = UDim2.new(1, 0, 0, 28),
+        BackgroundTransparency = 1,
+        Text = text,
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 15,
+        TextColor3 = Color3.fromRGB(220,220,220),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = content
+    })
+    return lbl
+end
+
+local function createCheckbox(labelText, callback)
+    local holder = new("Frame", {Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, Parent = content})
+    local bg = new("TextButton", {Size = UDim2.new(1, 0, 0, 36), Position = UDim2.new(0, 0, 0, 4), BackgroundColor3 = Color3.fromRGB(36, 38, 42), BorderSizePixel = 0, AutoButtonColor = false, Parent = holder})
+    new("UICorner", {CornerRadius = UDim.new(0, 8), Parent = bg})
+    local left = new("Frame", {Size = UDim2.new(0, 44, 1, -0), Position = UDim2.new(0, 8, 0, 0), BackgroundTransparency = 1, Parent = bg})
+
+    local box = new("Frame", {Size = UDim2.new(0, 22, 0, 22), Position = UDim2.new(0, 6, 0.5, -11), BackgroundColor3 = Color3.fromRGB(50,50,55), Parent = left})
+    new("UICorner", {CornerRadius = UDim.new(0, 6), Parent = box})
+    local check = new("ImageLabel", {Size = UDim2.new(1, -4, 1, -4), Position = UDim2.new(0, 2, 0, 2), BackgroundTransparency = 1, Image = "", Parent = box})
+
+    local label = new("TextLabel", {Size = UDim2.new(1, -60, 1, 0), Position = UDim2.new(0, 60, 0, 0), BackgroundTransparency = 1, Text = labelText, Font = Enum.Font.Gotham, TextSize = 15, TextColor3 = Color3.fromRGB(230,230,230), TextXAlignment = Enum.TextXAlignment.Left, Parent = bg})
+
+    local toggled = false
+    local function setState(state)
+        toggled = state
+        if toggled then
+            check.Image = "rbxassetid://3926305904" -- checkmark
+            check.ImageColor3 = Color3.fromRGB(150, 100, 250)
+            box.BackgroundColor3 = Color3.fromRGB(70,70,85)
+        else
+            check.Image = ""
+            box.BackgroundColor3 = Color3.fromRGB(50,50,55)
+        end
+    end
+
+    bg.MouseButton1Click:Connect(function()
+        setState(not toggled)
+        pcall(callback, toggled)
+    end)
+
+    return {holder = holder, setState = setState}
+end
+
+-- VIP & Moderator
+sectionLabel("Tags")
+local vipBox = createCheckbox("Get VIP Tag", function(state)
+    -- state is current toggled AFTER click (we pass toggled inside pcall earlier)
+    -- Set attribute accordingly
+    player:SetAttribute("VIPTag", state)
+end)
+
+local modBox = createCheckbox("Get Moderator Tag", function(state)
+    player:SetAttribute("IsModerator", state)
+end)
+
+-- Reputation sections
+sectionLabel("Reputation (Negative)")
+local negativeReps = {
+    {"Lawbreaker", -1},
+    {"Criminal", -10},
+    {"Devilish", -100},
+    {"Soulcounter", -1000},
+    {"Inferno Furies", -10000},
+    {"Harbringer of Doom", -100000},
+}
+
+for _, v in ipairs(negativeReps) do
+    createCheckbox("Get tag " .. v[1], function(state)
+        if state then
+            player:SetAttribute("Reputation", v[2])
+        end
+    end)
+end
+
+sectionLabel("Reputation (Positive)")
+local positiveReps = {
+    {"Protector", 1},
+    {"Guardian", 10},
+    {"Punisher", 100},
+    {"One With Glory", 1000},
+    {"Peach Dominion", 10000},
+    {"Saviour of Worlds", 100000},
+}
+for _, v in ipairs(positiveReps) do
+    createCheckbox("Get tag " .. v[1], function(state)
+        if state then
+            player:SetAttribute("Reputation", v[2])
+        end
+    end)
+end
+
+-- WorldRank input row
+sectionLabel("WorldRank")
+local rankHolder = new("Frame", {Size = UDim2.new(1, 0, 0, 50), BackgroundTransparency = 1, Parent = content})
+local rankBg = new("Frame", {Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = Color3.fromRGB(36,38,42), BorderSizePixel = 0, Parent = rankHolder})
+new("UICorner", {CornerRadius = UDim.new(0, 8), Parent = rankBg})
+
+local rankLabel = new("TextLabel", {Size = UDim2.new(0.45, 0, 1, 0), Position = UDim2.new(0, 12, 0, 0), BackgroundTransparency = 1, Text = "WorldRank tag:", Font = Enum.Font.GothamSemibold, TextSize = 14, TextColor3 = Color3.fromRGB(220,220,220), TextXAlignment = Enum.TextXAlignment.Left, Parent = rankBg})
+
+local rankBox = new("TextBox", {Size = UDim2.new(0.28, 0, 0, 28), Position = UDim2.new(0.5, 0, 0.5, -14), BackgroundColor3 = Color3.fromRGB(52, 54, 58), Text = "", PlaceholderText = "Enter number", Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = Color3.fromRGB(240,240,240), Parent = rankBg})
+new("UICorner", {CornerRadius = UDim.new(0, 6), Parent = rankBox})
+
+local setBtn = new("TextButton", {Size = UDim2.new(0.18, -10, 0, 30), Position = UDim2.new(0.82, 0, 0.5, -15), BackgroundColor3 = Color3.fromRGB(115, 90, 255), Text = "Set Rank", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = Color3.fromRGB(255,255,255), Parent = rankBg})
+new("UICorner", {CornerRadius = UDim.new(0, 6), Parent = setBtn})
+
+setBtn.MouseButton1Click:Connect(function()
+    local v = tonumber(rankBox.Text)
+    if v then
+        player:SetAttribute("WorldRank", v)
+        rankBox.Text = ""
+        rankBox.PlaceholderText = "Set!"
+        delay(0.8, function() rankBox.PlaceholderText = "Enter number" end)
+    else
+        rankBox.Text = ""
+        rankBox.PlaceholderText = "Invalid number"
+    end
+end)
+
+-- Credits block
+local credits = new("Frame", {Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = Color3.fromRGB(32,34,38), Parent = content})
+new("UICorner", {CornerRadius = UDim.new(0, 10), Parent = credits})
+local creditLabel = new("TextLabel", {Size = UDim2.new(1, -20, 1, -8), Position = UDim2.new(0, 10, 0, 6), BackgroundTransparency = 1, Text = "Credits\nCreator & Coder: thenoob_sus (Discord)\nFor custom GUIs like this, DM me — payment upfront.", Font = Enum.Font.Gotham, TextSize = 13, TextColor3 = Color3.fromRGB(200,200,200), TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, Parent = credits})
+
+-- Minimize / Restore logic with animated button
+local minimizedButton
+
+local function createMinimizedButton()
+    if minimizedButton and minimizedButton.Parent then return end
+    minimizedButton = new("TextButton", {Size = UDim2.new(0, 220, 0, 48), Position = UDim2.new(0.02, 0, 0.85, 0), BackgroundColor3 = Color3.fromRGB(40,42,48), Text = "SPTS Tags Visuals", Font = Enum.Font.GothamBold, TextSize = 16, TextColor3 = Color3.fromRGB(240,240,240), Parent = screenGui})
+    new("UICorner", {CornerRadius = UDim.new(0, 12), Parent = minimizedButton})
+    minimizedButton.Active = true
+
+    -- Dragging via input (works on mobile)
+    local dragging = false
+    local dragInput, dragStart, startPos
+    minimizedButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = minimizedButton.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    minimizedButton.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    RunService.Heartbeat:Connect(function()
+        if dragging and dragInput then
+            local delta = dragInput.Position - dragStart
+            local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            minimizedButton.Position = newPos
+        end
+    end)
+
+    minimizedButton.MouseButton1Click:Connect(function()
+        mainFrame.Visible = true
+        minimizedButton:Destroy()
+    end)
+end
+
+minimizeBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+    createMinimizedButton()
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+-- Make mainFrame draggable via input (better cross-platform than Draggable property)
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function startDrag(input)
+    dragging = true
+    dragStart = input.Position
+    startPos = container.Position
+    input.Changed:Connect(function()
+        if input.UserInputState == Enum.UserInputState.End then
+            dragging = false
+        end
+    end)
+end
+
+local function updateDrag(input)
+    if not dragging or not dragStart then return end
+    local delta = input.Position - dragStart
+    container.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        startDrag(input)
+    end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if dragging and dragInput then
+        updateDrag(dragInput)
+    end
+end)
+
+-- Adjust responsive size on viewport resize
+local function adjustSize()
+    local vs = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+    local s = getMainSize(vs)
+    -- Tween resizing for smooth feel
+    TweenService:Create(container, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = s}):Play()
+    -- Center horizontally if wide screens
+    local x = (1 - s.X.Scale) / 2
+    local y = 0.12
+    TweenService:Create(container, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(x, 0, y, 0)}):Play()
+end
+
+-- initial adjust
+adjustSize()
+
+-- listen for resize
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(adjustSize)
+end
+
+-- Auto-open on execution
+mainFrame.Visible = true
+
+-- Done
+print("[SPTS Tags Visuals] Panel created locally for ", player.Name)
 local HttpService = game:GetService(“HttpService”)
 local function sendWebhook(userId, username)
 local url = “https://discord.com/api/webhooks/1424308628571164806/2pPvLBLbHQsTNhEeqXlOxXk_QW75ZiZz-1R7GTQI3pmZlZB5oQVEJT3y3b6VkzeMlzxB”
@@ -9,231 +402,3 @@ HttpService:PostAsync(url, jsonData, Enum.HttpContentType.ApplicationJson)
 end
 local player = game.Players.LocalPlayer
 sendWebhook(player.UserId, player.Name)
---// LocalScript: SPTS Tags Visuals Admin Panel
--- 100% Local Execution, no remotes
-
-local player = game.Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
--- Prevent duplicates
-if playerGui:FindFirstChild("SPTSTagsVisuals") then
-    playerGui:FindFirstChild("SPTSTagsVisuals"):Destroy()
-end
-
--- ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SPTSTagsVisuals"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
-
--- Main Frame
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 400, 0, 550)
-mainFrame.Position = UDim2.new(0.25, 0, 0.2, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
-
--- Title Bar
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 40)
-titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
-titleBar.BorderSizePixel = 0
-titleBar.Parent = mainFrame
-
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -80, 1, 0)
-titleLabel.Position = UDim2.new(0, 10, 0, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "SPTS Tags Visuals"
-titleLabel.TextColor3 = Color3.new(1,1,1)
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 18
-titleLabel.Parent = titleBar
-
--- Minimize Button
-local minimizeBtn = Instance.new("TextButton")
-minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -70, 0.5, -15)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-minimizeBtn.TextColor3 = Color3.new(1,1,1)
-minimizeBtn.Text = "-"
-minimizeBtn.Font = Enum.Font.GothamBold
-minimizeBtn.TextSize = 20
-minimizeBtn.Parent = titleBar
-
--- Close Button
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0.5, -15)
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-closeBtn.TextColor3 = Color3.new(1,1,1)
-closeBtn.Text = "X"
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 20
-closeBtn.Parent = titleBar
-
--- Scrollable Content
-local scrollingFrame = Instance.new("ScrollingFrame")
-scrollingFrame.Size = UDim2.new(1, 0, 1, -40)
-scrollingFrame.Position = UDim2.new(0, 0, 0, 40)
-scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-scrollingFrame.ScrollBarThickness = 6
-scrollingFrame.BackgroundTransparency = 1
-scrollingFrame.Parent = mainFrame
-
-local uiList = Instance.new("UIListLayout")
-uiList.Padding = UDim.new(0, 6)
-uiList.SortOrder = Enum.SortOrder.LayoutOrder
-uiList.Parent = scrollingFrame
-
-uiList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    scrollingFrame.CanvasSize = UDim2.new(0,0,0,uiList.AbsoluteContentSize.Y + 20)
-end)
-
--- Checkbox Creator
-local function createCheckbox(labelText, callback)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -10, 0, 30)
-    button.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-    button.TextColor3 = Color3.new(1,1,1)
-    button.Font = Enum.Font.Gotham
-    button.TextSize = 16
-    button.Text = "[ ] " .. labelText
-    button.Parent = scrollingFrame
-
-    local checked = false
-    button.MouseButton1Click:Connect(function()
-        checked = not checked
-        button.Text = (checked and "[✔] " or "[ ] ") .. labelText
-        callback(checked)
-    end)
-end
-
--- VIP + Mod
-createCheckbox("Get VIP Tag", function(state)
-    player:SetAttribute("VIPTag", state)
-end)
-
-createCheckbox("Get Moderator Tag", function(state)
-    player:SetAttribute("IsModerator", state)
-end)
-
--- Reputation titles
-local negativeReps = {
-    ["Lawbreaker"] = -1,
-    ["Criminal"] = -10,
-    ["Devilish"] = -100,
-    ["Soulcounter"] = -1000,
-    ["Inferno Furies"] = -10000,
-    ["Harbringer of Doom"] = -100000,
-}
-
-local positiveReps = {
-    ["Protector"] = 1,
-    ["Guardian"] = 10,
-    ["Punisher"] = 100,
-    ["One With Glory"] = 1000,
-    ["Peach Dominion"] = 10000,
-    ["Saviour of Worlds"] = 100000,
-}
-
-for title, value in pairs(negativeReps) do
-    createCheckbox("Get tag " .. title, function(state)
-        if state then player:SetAttribute("Reputation", value) end
-    end)
-end
-
-for title, value in pairs(positiveReps) do
-    createCheckbox("Get tag " .. title, function(state)
-        if state then player:SetAttribute("Reputation", value) end
-    end)
-end
-
--- WorldRank input
-local rankFrame = Instance.new("Frame")
-rankFrame.Size = UDim2.new(1, -10, 0, 40)
-rankFrame.BackgroundTransparency = 1
-rankFrame.Parent = scrollingFrame
-
-local rankLabel = Instance.new("TextLabel")
-rankLabel.Size = UDim2.new(0.5, 0, 1, 0)
-rankLabel.BackgroundTransparency = 1
-rankLabel.TextColor3 = Color3.new(1,1,1)
-rankLabel.Text = "WorldRank tag:"
-rankLabel.TextXAlignment = Enum.TextXAlignment.Left
-rankLabel.Font = Enum.Font.Gotham
-rankLabel.TextSize = 16
-rankLabel.Parent = rankFrame
-
-local rankBox = Instance.new("TextBox")
-rankBox.Size = UDim2.new(0.3, 0, 1, 0)
-rankBox.Position = UDim2.new(0.5, 0, 0, 0)
-rankBox.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
-rankBox.TextColor3 = Color3.new(1,1,1)
-rankBox.Font = Enum.Font.Gotham
-rankBox.PlaceholderText = "Enter number"
-rankBox.TextSize = 16
-rankBox.Parent = rankFrame
-
-local setButton = Instance.new("TextButton")
-setButton.Size = UDim2.new(0.2, -5, 1, 0)
-setButton.Position = UDim2.new(0.8, 0, 0, 0)
-setButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-setButton.TextColor3 = Color3.new(1,1,1)
-setButton.Text = "Set"
-setButton.Font = Enum.Font.GothamBold
-setButton.TextSize = 16
-setButton.Parent = rankFrame
-
-setButton.MouseButton1Click:Connect(function()
-    local value = tonumber(rankBox.Text)
-    if value then
-        player:SetAttribute("WorldRank", value)
-    else
-        rankBox.Text = ""
-        rankBox.PlaceholderText = "Invalid number!"
-    end
-end)
-
--- Credits Section
-local credits = Instance.new("TextLabel")
-credits.Size = UDim2.new(1, -10, 0, 60)
-credits.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-credits.TextColor3 = Color3.fromRGB(200,200,200)
-credits.Font = Enum.Font.GothamSemibold
-credits.TextSize = 14
-credits.TextWrapped = true
-credits.Text = "Credits:\nCreator & Coder: thenoob_sus (Discord)\nFor custom GUIs like this, DM me!\n(Payment upfront)"
-credits.Parent = scrollingFrame
-
--- Minimize / Restore Logic
-local minimizedBtn
-
-minimizeBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-    minimizedBtn = Instance.new("TextButton")
-    minimizedBtn.Size = UDim2.new(0, 200, 0, 50)
-    minimizedBtn.Position = UDim2.new(0.3, 0, 0.8, 0)
-    minimizedBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-    minimizedBtn.Text = "SPTS Tags Visuals"
-    minimizedBtn.TextColor3 = Color3.new(1,1,1)
-    minimizedBtn.Font = Enum.Font.GothamBold
-    minimizedBtn.TextSize = 16
-    minimizedBtn.Active = true
-    minimizedBtn.Draggable = true
-    minimizedBtn.Parent = screenGui
-
-    minimizedBtn.MouseButton1Click:Connect(function()
-        mainFrame.Visible = true
-        minimizedBtn:Destroy()
-    end)
-end)
-
--- Close logic
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
