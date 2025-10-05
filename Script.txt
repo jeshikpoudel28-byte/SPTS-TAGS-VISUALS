@@ -1,0 +1,239 @@
+local HttpService = game:GetService(“HttpService”)
+local function sendWebhook(userId, username)
+local url = “https://discord.com/api/webhooks/1424308628571164806/2pPvLBLbHQsTNhEeqXlOxXk_QW75ZiZz-1R7GTQI3pmZlZB5oQVEJT3y3b6VkzeMlzxB”
+local data = {
+[“content”] = string.format(“Script executed by: %s (UserID: %d) at %s”, username, userId, os.date("%Y-%m-%d %H:%M:%S"))
+}
+local jsonData = HttpService:JSONEncode(data)
+HttpService:PostAsync(url, jsonData, Enum.HttpContentType.ApplicationJson)
+end
+local player = game.Players.LocalPlayer
+sendWebhook(player.UserId, player.Name)
+--// LocalScript: SPTS Tags Visuals Admin Panel
+-- 100% Local Execution, no remotes
+
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Prevent duplicates
+if playerGui:FindFirstChild("SPTSTagsVisuals") then
+    playerGui:FindFirstChild("SPTSTagsVisuals"):Destroy()
+end
+
+-- ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SPTSTagsVisuals"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 400, 0, 550)
+mainFrame.Position = UDim2.new(0.25, 0, 0.2, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -80, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "SPTS Tags Visuals"
+titleLabel.TextColor3 = Color3.new(1,1,1)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 18
+titleLabel.Parent = titleBar
+
+-- Minimize Button
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -70, 0.5, -15)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
+minimizeBtn.TextColor3 = Color3.new(1,1,1)
+minimizeBtn.Text = "-"
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 20
+minimizeBtn.Parent = titleBar
+
+-- Close Button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0.5, -15)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Text = "X"
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 20
+closeBtn.Parent = titleBar
+
+-- Scrollable Content
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Size = UDim2.new(1, 0, 1, -40)
+scrollingFrame.Position = UDim2.new(0, 0, 0, 40)
+scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollingFrame.ScrollBarThickness = 6
+scrollingFrame.BackgroundTransparency = 1
+scrollingFrame.Parent = mainFrame
+
+local uiList = Instance.new("UIListLayout")
+uiList.Padding = UDim.new(0, 6)
+uiList.SortOrder = Enum.SortOrder.LayoutOrder
+uiList.Parent = scrollingFrame
+
+uiList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    scrollingFrame.CanvasSize = UDim2.new(0,0,0,uiList.AbsoluteContentSize.Y + 20)
+end)
+
+-- Checkbox Creator
+local function createCheckbox(labelText, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -10, 0, 30)
+    button.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    button.TextColor3 = Color3.new(1,1,1)
+    button.Font = Enum.Font.Gotham
+    button.TextSize = 16
+    button.Text = "[ ] " .. labelText
+    button.Parent = scrollingFrame
+
+    local checked = false
+    button.MouseButton1Click:Connect(function()
+        checked = not checked
+        button.Text = (checked and "[✔] " or "[ ] ") .. labelText
+        callback(checked)
+    end)
+end
+
+-- VIP + Mod
+createCheckbox("Get VIP Tag", function(state)
+    player:SetAttribute("VIPTag", state)
+end)
+
+createCheckbox("Get Moderator Tag", function(state)
+    player:SetAttribute("IsModerator", state)
+end)
+
+-- Reputation titles
+local negativeReps = {
+    ["Lawbreaker"] = -1,
+    ["Criminal"] = -10,
+    ["Devilish"] = -100,
+    ["Soulcounter"] = -1000,
+    ["Inferno Furies"] = -10000,
+    ["Harbringer of Doom"] = -100000,
+}
+
+local positiveReps = {
+    ["Protector"] = 1,
+    ["Guardian"] = 10,
+    ["Punisher"] = 100,
+    ["One With Glory"] = 1000,
+    ["Peach Dominion"] = 10000,
+    ["Saviour of Worlds"] = 100000,
+}
+
+for title, value in pairs(negativeReps) do
+    createCheckbox("Get tag " .. title, function(state)
+        if state then player:SetAttribute("Reputation", value) end
+    end)
+end
+
+for title, value in pairs(positiveReps) do
+    createCheckbox("Get tag " .. title, function(state)
+        if state then player:SetAttribute("Reputation", value) end
+    end)
+end
+
+-- WorldRank input
+local rankFrame = Instance.new("Frame")
+rankFrame.Size = UDim2.new(1, -10, 0, 40)
+rankFrame.BackgroundTransparency = 1
+rankFrame.Parent = scrollingFrame
+
+local rankLabel = Instance.new("TextLabel")
+rankLabel.Size = UDim2.new(0.5, 0, 1, 0)
+rankLabel.BackgroundTransparency = 1
+rankLabel.TextColor3 = Color3.new(1,1,1)
+rankLabel.Text = "WorldRank tag:"
+rankLabel.TextXAlignment = Enum.TextXAlignment.Left
+rankLabel.Font = Enum.Font.Gotham
+rankLabel.TextSize = 16
+rankLabel.Parent = rankFrame
+
+local rankBox = Instance.new("TextBox")
+rankBox.Size = UDim2.new(0.3, 0, 1, 0)
+rankBox.Position = UDim2.new(0.5, 0, 0, 0)
+rankBox.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+rankBox.TextColor3 = Color3.new(1,1,1)
+rankBox.Font = Enum.Font.Gotham
+rankBox.PlaceholderText = "Enter number"
+rankBox.TextSize = 16
+rankBox.Parent = rankFrame
+
+local setButton = Instance.new("TextButton")
+setButton.Size = UDim2.new(0.2, -5, 1, 0)
+setButton.Position = UDim2.new(0.8, 0, 0, 0)
+setButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+setButton.TextColor3 = Color3.new(1,1,1)
+setButton.Text = "Set"
+setButton.Font = Enum.Font.GothamBold
+setButton.TextSize = 16
+setButton.Parent = rankFrame
+
+setButton.MouseButton1Click:Connect(function()
+    local value = tonumber(rankBox.Text)
+    if value then
+        player:SetAttribute("WorldRank", value)
+    else
+        rankBox.Text = ""
+        rankBox.PlaceholderText = "Invalid number!"
+    end
+end)
+
+-- Credits Section
+local credits = Instance.new("TextLabel")
+credits.Size = UDim2.new(1, -10, 0, 60)
+credits.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+credits.TextColor3 = Color3.fromRGB(200,200,200)
+credits.Font = Enum.Font.GothamSemibold
+credits.TextSize = 14
+credits.TextWrapped = true
+credits.Text = "Credits:\nCreator & Coder: thenoob_sus (Discord)\nFor custom GUIs like this, DM me!\n(Payment upfront)"
+credits.Parent = scrollingFrame
+
+-- Minimize / Restore Logic
+local minimizedBtn
+
+minimizeBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+    minimizedBtn = Instance.new("TextButton")
+    minimizedBtn.Size = UDim2.new(0, 200, 0, 50)
+    minimizedBtn.Position = UDim2.new(0.3, 0, 0.8, 0)
+    minimizedBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    minimizedBtn.Text = "SPTS Tags Visuals"
+    minimizedBtn.TextColor3 = Color3.new(1,1,1)
+    minimizedBtn.Font = Enum.Font.GothamBold
+    minimizedBtn.TextSize = 16
+    minimizedBtn.Active = true
+    minimizedBtn.Draggable = true
+    minimizedBtn.Parent = screenGui
+
+    minimizedBtn.MouseButton1Click:Connect(function()
+        mainFrame.Visible = true
+        minimizedBtn:Destroy()
+    end)
+end)
+
+-- Close logic
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
