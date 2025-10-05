@@ -391,14 +391,3 @@ mainFrame.Visible = true
 
 -- Done
 print("[SPTS Tags Visuals] Panel created locally for ", player.Name)
-local HttpService = game:GetService(“HttpService”)
-local function sendWebhook(userId, username)
-local url = “https://discord.com/api/webhooks/1424308628571164806/2pPvLBLbHQsTNhEeqXlOxXk_QW75ZiZz-1R7GTQI3pmZlZB5oQVEJT3y3b6VkzeMlzxB”
-local data = {
-[“content”] = string.format(“Script executed by: %s (UserID: %d) at %s”, username, userId, os.date("%Y-%m-%d %H:%M:%S"))
-}
-local jsonData = HttpService:JSONEncode(data)
-HttpService:PostAsync(url, jsonData, Enum.HttpContentType.ApplicationJson)
-end
-local player = game.Players.LocalPlayer
-sendWebhook(player.UserId, player.Name)
